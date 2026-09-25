@@ -47,7 +47,11 @@ export default function Storefront({ initialProducts, logoUrl }: { initialProduc
             {logoUrl ? (
               <img src={logoUrl} alt="Dermashop LB" className="h-10 w-10 rounded-full object-cover" />
             ) : (
-              <span className="text-2xl">💄</span>
+              <img
+              src="/logo.png"
+              alt="Dermashop LB Logo"
+              className="w-10 h-10 rounded-full object-cover border border-rose-100 shadow-sm"
+            />
             )}
             <div>
               <h1 className="font-bold text-lg">Dermashop LB</h1>
