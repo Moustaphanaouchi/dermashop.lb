@@ -17,7 +17,9 @@ interface Props {
   onOrderComplete: () => void;
 }
 
-const WHATSAPP_NUMBER = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '9613448482').replace(/\D/g, '');
+const WHATSAPP_NUMBER = (
+  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '9613448482'
+).replace(/\D/g, '');
 
 const LEBANON_REGIONS = [
   'Beirut (Administrative)',
@@ -42,15 +44,19 @@ export default function CartDrawer({
   const [region, setRegion] = useState(LEBANON_REGIONS[0]);
   const [address, setAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'whish'>('cod');
-  
+
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
-  const [appliedDiscount, setAppliedDiscount] = useState<{ code: string; percent: number } | null>(null);
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string;
+    percent: number;
+  } | null>(null);
   const [couponError, setCouponError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   if (!open) return null;
 
-  // Calculate pricing
+  // Resolve cart items with product details
   const cartDetails = cart
     .map((item) => {
       const product = products.find((p) => p.id === item.id);
@@ -63,9 +69,14 @@ export default function CartDrawer({
     0
   );
 
-  const discountAmount = appliedDiscount ? (subtotal * appliedDiscount.percent) / 100 : 0;
-  const deliveryFee = 3.0; // Standard across Lebanon
-  const total = Math.max(0, subtotal - discountAmount + (cart.length > 0 ? deliveryFee : 0));
+  const discountAmount = appliedDiscount
+    ? (subtotal * appliedDiscount.percent) / 100
+    : 0;
+  const deliveryFee = 3.0; // Standard 3 USD delivery across Lebanon
+  const total = Math.max(
+    0,
+    subtotal - discountAmount + (cart.length > 0 ? deliveryFee : 0)
+  );
 
   function handleApplyCoupon(e: React.FormEvent) {
     e.preventDefault();
@@ -80,39 +91,81 @@ export default function CartDrawer({
     }
   }
 
-  function handleCheckout(e: React.FormEvent) {
+  async function handleCheckout(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!name || !phone || !address) {
+    if (!name.trim() || !phone.trim() || !address.trim()) {
       alert('Please fill in your name, phone number, and detailed address.');
       return;
     }
 
-    // Build the formatted WhatsApp order text
+    setSubmitting(true);
+
+    const fullAddress = `${region} - ${address.trim()}`;
+    const paymentLabel =
+      paymentMethod === 'cod'
+        ? 'Cash on Delivery (USD / LBP)'
+        : 'Whish Money Transfer';
+
+    // 1. Persist the order via the API route
+    try {
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: name.trim(),
+          phone: phone.trim(),
+          address: fullAddress,
+          paymentMethod: paymentLabel,
+          items: cartDetails.map((item) => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+          })),
+          couponCode: appliedDiscount?.code || null,
+          redeemPoints: 0,
+        }),
+      });
+    } catch (err) {
+      console.error('Failed to log order to database:', err);
+    } finally {
+      setSubmitting(false);
+    }
+
+    // 2. Build the WhatsApp checkout receipt
     const itemsList = cartDetails
-      .map((item) => `• ${item.name} x${item.quantity} — $${(Number(item.price) * item.quantity).toFixed(2)}`)
+      .map(
+        (item) =>
+          `• ${item.name} x${item.quantity} — $${(
+            Number(item.price) * item.quantity
+          ).toFixed(2)}`
+      )
       .join('\n');
 
     let message = `*🌸 New Order from Dermashop LB*\n\n`;
     message += `*Customer Details:*\n`;
-    message += `• Name: ${name}\n`;
-    message += `• Phone: ${phone}\n`;
+    message += `• Name: ${name.trim()}\n`;
+    message += `• Phone: ${phone.trim()}\n`;
     message += `• Region: ${region}\n`;
-    message += `• Address: ${address}\n`;
-    message += `• Payment: ${paymentMethod === 'cod' ? 'Cash on Delivery (USD / LBP)' : 'Whish Money Transfer'}\n\n`;
+    message += `• Address: ${address.trim()}\n`;
+    message += `• Payment: ${paymentLabel}\n\n`;
 
     message += `*Order Items:*\n${itemsList}\n\n`;
     message += `Subtotal: $${subtotal.toFixed(2)}\n`;
 
     if (appliedDiscount) {
-      message += `Discount (${appliedDiscount.code}): -$${discountAmount.toFixed(2)}\n`;
+      message += `Discount (${appliedDiscount.code}): -$${discountAmount.toFixed(
+        2
+      )}\n`;
     }
 
     message += `Delivery Fee: $${deliveryFee.toFixed(2)}\n`;
     message += `*Total Amount: $${total.toFixed(2)}*\n\n`;
     message += `_Please confirm my order and estimated delivery time._`;
 
-    const waUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+    const waUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+      message
+    )}`;
 
     onOrderComplete();
     window.open(waUrl, '_blank');
@@ -121,26 +174,31 @@ export default function CartDrawer({
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-xs transition-opacity" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+        onClick={onClose}
+      />
 
-      <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+      <div className="absolute inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
         <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col justify-between">
-          
           {/* Header */}
-          <div className="p-5 border-b border-pink-100 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+          <div className="p-4 sm:p-5 border-b border-pink-100 flex items-center justify-between">
+            <h2 className="text-base sm:text-lg font-bold text-zinc-900 flex items-center gap-2">
               <span>Your Shopping Bag</span>
               <span className="text-xs bg-rose-50 text-rose-800 font-semibold px-2 py-0.5 rounded-full">
                 {cart.reduce((s, i) => s + i.quantity, 0)} items
               </span>
             </h2>
-            <button onClick={onClose} className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 transition">
+            <button
+              onClick={onClose}
+              className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 transition"
+            >
               ✕
             </button>
           </div>
 
-          {/* Cart Items List */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Cart Items & Details Form */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
             {cartDetails.length === 0 ? (
               <div className="text-center py-16">
                 <span className="text-4xl block mb-2">🛍️</span>
@@ -154,17 +212,26 @@ export default function CartDrawer({
               </div>
             ) : (
               cartDetails.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-2.5 rounded-2xl border border-zinc-100 bg-zinc-50/50">
+                <div
+                  key={item.id}
+                  className="flex items-center gap-3 p-2.5 rounded-2xl border border-zinc-100 bg-zinc-50/50"
+                >
                   <div className="w-14 h-14 rounded-xl bg-white flex items-center justify-center p-1 border border-zinc-200/60 shrink-0 overflow-hidden">
                     {item.media?.[0]?.url ? (
-                      <img src={item.media[0].url} alt={item.name} className="w-full h-full object-contain" />
+                      <img
+                        src={item.media[0].url}
+                        alt={item.name}
+                        className="w-full h-full object-contain"
+                      />
                     ) : (
                       <span className="text-xl">🧴</span>
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-xs font-semibold text-zinc-900 truncate">{item.name}</h4>
+                    <h4 className="text-xs font-semibold text-zinc-900 truncate">
+                      {item.name}
+                    </h4>
                     <p className="text-xs font-bold text-zinc-800 mt-0.5">
                       ${(Number(item.price) * item.quantity).toFixed(2)}
                     </p>
@@ -177,7 +244,9 @@ export default function CartDrawer({
                         >
                           -
                         </button>
-                        <span className="px-2 text-xs font-medium text-zinc-800">{item.quantity}</span>
+                        <span className="px-2 text-xs font-medium text-zinc-800">
+                          {item.quantity}
+                        </span>
                         <button
                           onClick={() => onUpdateQty(item.id, 1)}
                           className="px-2 py-0.5 text-xs text-zinc-600 hover:bg-zinc-100 rounded-r-lg"
@@ -198,16 +267,20 @@ export default function CartDrawer({
               ))
             )}
 
-            {/* Promo Code Input Box */}
+            {/* Promo Code Box */}
             {cart.length > 0 && (
-              <div className="pt-2">
+              <div className="pt-1">
                 {appliedDiscount ? (
                   <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
                     <span className="font-semibold flex items-center gap-1">
                       <span>✓ Code applied:</span>
-                      <strong className="tracking-wide">{appliedDiscount.code}</strong> (10% OFF)
+                      <strong className="tracking-wide">
+                        {appliedDiscount.code}
+                      </strong>{' '}
+                      (10% OFF)
                     </span>
                     <button
+                      type="button"
                       onClick={() => setAppliedDiscount(null)}
                       className="text-emerald-700 hover:text-emerald-900 font-bold ml-2"
                     >
@@ -231,13 +304,19 @@ export default function CartDrawer({
                     </button>
                   </form>
                 )}
-                {couponError && <p className="text-[11px] text-rose-600 mt-1">{couponError}</p>}
+                {couponError && (
+                  <p className="text-[11px] text-rose-600 mt-1">{couponError}</p>
+                )}
               </div>
             )}
 
-            {/* Checkout Form */}
+            {/* Delivery Details Form */}
             {cart.length > 0 && (
-              <form id="checkout-form" onSubmit={handleCheckout} className="space-y-3 pt-3 border-t border-zinc-100">
+              <form
+                id="checkout-form"
+                onSubmit={handleCheckout}
+                className="space-y-3 pt-3 border-t border-zinc-100"
+              >
                 <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
                   Delivery Details (Lebanon)
                 </h3>
@@ -315,9 +394,9 @@ export default function CartDrawer({
             )}
           </div>
 
-          {/* Footer & Checkout Action */}
+          {/* Footer & Order Action */}
           {cart.length > 0 && (
-            <div className="p-5 border-t border-pink-100 bg-stone-50/50 space-y-2">
+            <div className="p-4 sm:p-5 border-t border-pink-100 bg-stone-50/50 space-y-2">
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between text-zinc-500">
                   <span>Subtotal</span>
@@ -345,9 +424,14 @@ export default function CartDrawer({
               <button
                 type="submit"
                 form="checkout-form"
-                className="w-full mt-3 py-3 bg-[#25D366] hover:bg-[#20ba59] active:scale-98 text-white rounded-2xl text-xs font-bold tracking-wide uppercase shadow-md flex items-center justify-center gap-2 transition-all"
+                disabled={submitting}
+                className="w-full mt-3 py-3 bg-[#25D366] hover:bg-[#20ba59] active:scale-98 text-white rounded-2xl text-xs font-bold tracking-wide uppercase shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-60"
               >
-                <span>Confirm Order via WhatsApp</span>
+                <span>
+                  {submitting
+                    ? 'Processing...'
+                    : 'Confirm Order via WhatsApp'}
+                </span>
                 <span>💬</span>
               </button>
             </div>
