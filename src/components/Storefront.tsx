@@ -5,6 +5,8 @@ import ProductCard from './ProductCard';
 import CartDrawer from './CartDrawer';
 import ProductDetailModal from './ProductDetailModal';
 import { CatalogSearch } from '@/components/CatalogSearch';
+import TrustBadges from './TrustBadges';
+import CustomerReviews from './CustomerReviews';
 
 const CATEGORIES = [
   { id: 'all', label: 'All Products' },
@@ -28,7 +30,6 @@ export default function Storefront({
   const [category, setCategory] = useState('all');
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
 
-  // Updated to handle bulk/bundle quantities from the quick-view modal and product card
   function addToCart(id: string, quantityToAdd: number = 1) {
     setCart((prev) => {
       const existing = prev.find((i) => i.id === id);
@@ -43,7 +44,9 @@ export default function Storefront({
 
   function updateQty(id: string, delta: number) {
     setCart((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, quantity: i.quantity + delta } : i)).filter((i) => i.quantity > 0)
+      prev
+        .map((i) => (i.id === id ? { ...i, quantity: i.quantity + delta } : i))
+        .filter((i) => i.quantity > 0)
     );
   }
 
@@ -60,7 +63,6 @@ export default function Storefront({
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           {/* Top Line on Mobile, Single Flex Row on Desktop */}
           <div className="flex items-center justify-between gap-3">
-            
             {/* Left: Brand Logo & Title */}
             <div className="flex items-center gap-2.5 shrink-0">
               {logoUrl ? (
@@ -73,7 +75,9 @@ export default function Storefront({
                 />
               )}
               <div>
-                <h1 className="font-bold text-sm sm:text-base leading-tight text-zinc-900">Dermashop LB</h1>
+                <h1 className="font-bold text-sm sm:text-base leading-tight text-zinc-900">
+                  Dermashop LB
+                </h1>
                 <p className="text-[10px] text-zinc-400 hidden xs:block">Hair & Skin Solutions</p>
               </div>
             </div>
@@ -119,7 +123,7 @@ export default function Storefront({
       </header>
 
       {/* Hero Section */}
-      <section className="max-w-6xl mx-auto px-4 pt-14 pb-8 text-center">
+      <section className="max-w-6xl mx-auto px-4 pt-14 pb-4 text-center">
         <span className="inline-block bg-blush text-maroon text-xs font-semibold px-4 py-1 rounded-full mb-4">
           🌍 Worldwide Shipping Available
         </span>
@@ -140,7 +144,9 @@ export default function Storefront({
               key={c.id}
               onClick={() => setCategory(c.id)}
               className={`px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold border transition ${
-                category === c.id ? 'bg-maroon text-white border-maroon' : 'bg-white border-pink-200 text-zinc-700'
+                category === c.id
+                  ? 'bg-maroon text-white border-maroon'
+                  : 'bg-white border-pink-200 text-zinc-700'
               }`}
             >
               {c.label}
@@ -149,8 +155,11 @@ export default function Storefront({
         </div>
       </section>
 
+      {/* Trust & Guarantee Badges */}
+      <TrustBadges />
+
       {/* Product Catalog Grid */}
-      <section className="max-w-6xl mx-auto px-4 pb-20">
+      <section className="max-w-6xl mx-auto px-4 pb-16">
         {filteredProducts.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-zinc-400 text-base sm:text-lg mb-2">No matching products found.</p>
@@ -164,21 +173,53 @@ export default function Storefront({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProducts.map((p) => (
-              <ProductCard 
-                key={p.id} 
-                product={p} 
-                onAdd={addToCart} 
-                onQuickView={setSelectedProduct} 
+              <ProductCard
+                key={p.id}
+                product={p}
+                onAdd={addToCart}
+                onQuickView={setSelectedProduct}
               />
             ))}
           </div>
         )}
       </section>
 
-      <footer className="bg-zinc-900 text-white py-10 text-center text-sm">
-        <p>📞 +961 3 448 482 &nbsp;·&nbsp; 💳 Cash on Delivery or WishPay</p>
-        <p className="mt-2 text-zinc-400">🚚 Delivering to all regions of Lebanon</p>
-        <p className="mt-4 text-zinc-500">&copy; {new Date().getFullYear()} Dermashop LB</p>
+      {/* Customer Testimonials & Reviews */}
+      <CustomerReviews />
+
+      {/* Brand & Social Footer */}
+      <footer className="bg-zinc-900 text-white py-12 px-4 text-center text-sm">
+        <div className="max-w-md mx-auto space-y-3">
+          <div className="flex items-center justify-center gap-3">
+            <img src="/logo.png" alt="Dermashop LB" className="w-8 h-8 rounded-full border border-zinc-700" />
+            <span className="font-bold text-base tracking-wide">Dermashop LB</span>
+          </div>
+          <p className="text-xs text-zinc-400">
+            Premium Clinical Hair & Skin Solutions delivered across all Lebanese territories.
+          </p>
+          <div className="flex justify-center items-center gap-4 text-xs pt-1">
+            <a
+              href="https://instagram.com/dermashop.lb"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-pink-300 hover:text-pink-200 transition font-medium underline"
+            >
+              Follow on Instagram @dermashop.lb 📸
+            </a>
+            <span>·</span>
+            <a
+              href="https://wa.me/9613448482"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-400 hover:text-emerald-300 transition font-medium underline"
+            >
+              WhatsApp Support 💬
+            </a>
+          </div>
+          <p className="text-[11px] text-zinc-500 pt-3 border-t border-zinc-800">
+            &copy; {new Date().getFullYear()} Dermashop LB. All rights reserved.
+          </p>
+        </div>
       </footer>
 
       {/* Quick View Modal */}
@@ -188,6 +229,7 @@ export default function Storefront({
         onAdd={addToCart}
       />
 
+      {/* Shopping Bag Drawer */}
       <CartDrawer
         open={cartOpen}
         onClose={() => setCartOpen(false)}
