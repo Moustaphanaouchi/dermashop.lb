@@ -117,7 +117,7 @@ export default function CartDrawer({ open, onClose, cart, products, onUpdateQty,
         pointsEarned: data.pointsEarned,
       });
 
-      window.open(whatsappUrl(message), '_blank');
+      window.location.href = whatsappUrl(message);
       onOrderComplete();
       onClose();
     } catch (e) {
