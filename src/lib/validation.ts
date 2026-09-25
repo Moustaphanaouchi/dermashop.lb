@@ -24,10 +24,24 @@ export const couponSchema = z.object({
 });
 
 export const orderSchema = z.object({
-  customerName: z.string().min(2).max(100).trim(),
-  phone: z.string().regex(/^\+?[0-9]{7,15}$/, 'Invalid phone number'),
-  address: z.string().min(8).max(500).trim(),
-  paymentMethod: z.enum(['cash', 'wishpay']),
+  customerName: z.string().min(2, 'Name must be at least 2 characters').max(100).trim(),
+  // Strips out spaces, brackets, and dashes before validating length
+  phone: z
+    .string()
+    .transform((val) => val.replace(/[\s\-\(\)]/g, ''))
+    .pipe(z.string().regex(/^\+?[0-9]{7,15}$/, 'Invalid phone number')),
+  address: z.string().min(5, 'Address is too short').max(500).trim(),
+  // Accepts either the internal keys or full UI labels
+  paymentMethod: z.enum([
+    'cash',
+    'wishpay',
+    'cod',
+    'whish',
+    'Cash on Delivery',
+    'Cash on Delivery (USD / LBP)',
+    'Whish Money',
+    'Whish Money Transfer',
+  ]),
 });
 
 export function sanitizeHtml(input: string): string {

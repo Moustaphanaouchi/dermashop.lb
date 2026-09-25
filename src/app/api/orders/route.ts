@@ -7,7 +7,7 @@ import { calculateDelivery, calculatePointsEarned, calculatePointsDiscount, line
 export async function POST(req: NextRequest) {
   try {
     const forwarded = req.headers.get('x-forwarded-for');
-const ip = forwarded ? forwarded.split(',')[0].trim() : (req.headers.get('x-real-ip') ?? '127.0.0.1');
+    const ip = forwarded ? forwarded.split(',')[0].trim() : (req.headers.get('x-real-ip') ?? '127.0.0.1');
     const { success } = await orderRateLimit.limit(ip);
     if (!success) {
       return NextResponse.json({ error: 'Too many orders. Please wait before ordering again.' }, { status: 429 });
@@ -22,22 +22,24 @@ const ip = forwarded ? forwarded.split(',')[0].trim() : (req.headers.get('x-real
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
     }
 
+    // 1. Fetch products & validate stock
     const productIds = items.map((i: any) => i.id);
     const products = await prisma.product.findMany({ where: { id: { in: productIds } } });
 
     let subtotal = 0;
-    const lineItems: { name: string; quantity: number; total: number }[] = [];
+    const lineItems: { id: string; name: string; quantity: number; total: number }[] = [];
 
     for (const item of items) {
-      const p = products.find((p) => p.id === item.id);
+      const p = products.find((prod) => prod.id === item.id);
       if (!p) return NextResponse.json({ error: `Product not found: ${item.id}` }, { status: 400 });
       if (!p.stock) return NextResponse.json({ error: `Out of stock: ${p.name}` }, { status: 400 });
 
       const total = lineTotal(p.price, item.quantity, p.bulkPrice, p.bulkQty);
       subtotal += total;
-      lineItems.push({ name: p.name, quantity: item.quantity, total });
+      lineItems.push({ id: p.id, name: p.name, quantity: item.quantity, total });
     }
 
+    // 2. Fetch or create customer
     let customer = await prisma.customer.findUnique({ where: { phone: validated.phone } });
     const isFirstOrder = !customer;
     if (!customer) {
@@ -46,60 +48,74 @@ const ip = forwarded ? forwarded.split(',')[0].trim() : (req.headers.get('x-real
       });
     }
 
-    let discount = 0;
+    // 3. Coupon evaluation
+    let couponDiscount = 0;
     let appliedCoupon: string | null = null;
 
     if (couponCode) {
-      const coupon = await prisma.coupon.findUnique({ where: { code: couponCode.toUpperCase().trim() } });
+      const cleanCode = couponCode.toUpperCase().trim();
+      const coupon = await prisma.coupon.findUnique({ where: { code: cleanCode } });
+      
       if (coupon && coupon.active) {
         if (coupon.firstOrderOnly && !isFirstOrder) {
           return NextResponse.json({ error: 'This coupon is for first-time customers only' }, { status: 400 });
         }
-        let couponDiscount = 0;
-        if (coupon.percentOff) couponDiscount = Math.max(couponDiscount, subtotal * (coupon.percentOff / 100));
-        if (coupon.dollarOff) couponDiscount = Math.max(couponDiscount, coupon.dollarOff);
-        discount += couponDiscount;
+        if (coupon.percentOff) {
+          couponDiscount = Math.max(couponDiscount, (subtotal * coupon.percentOff) / 100);
+        }
+        if (coupon.dollarOff) {
+          couponDiscount = Math.max(couponDiscount, coupon.dollarOff);
+        }
         appliedCoupon = coupon.code;
       }
     }
 
+    // 4. Points calculation
     let pointsUsed = 0;
+    let pointsDiscount = 0;
     if (redeemPoints && customer.points >= 100) {
       const maxRedeemable = Math.floor(customer.points / 100) * 100;
-      pointsUsed = Math.min(Number(redeemPoints), maxRedeemable);
-      discount += calculatePointsDiscount(pointsUsed);
+      pointsUsed = Math.min(Math.max(0, Number(redeemPoints)), maxRedeemable);
+      pointsDiscount = calculatePointsDiscount(pointsUsed);
     }
 
-    const afterDiscount = Math.max(0, subtotal - discount);
+    // 5. Total Calculations (capped discount to avoid negative totals)
+    const totalDiscount = Math.min(subtotal, couponDiscount + pointsDiscount);
+    const afterDiscount = Math.max(0, subtotal - totalDiscount);
     const deliveryFee = calculateDelivery(afterDiscount);
     const total = afterDiscount + deliveryFee;
     const pointsEarned = calculatePointsEarned(total);
 
-    const order = await prisma.order.create({
-      data: {
-        customerId: customer.id,
-        customerName: validated.customerName,
-        phone: validated.phone,
-        address: validated.address,
-        paymentMethod: validated.paymentMethod,
-        items: JSON.stringify(lineItems),
-        subtotal,
-        deliveryFee,
-        discount,
-        pointsUsed,
-        pointsEarned,
-        total,
-        couponCode: appliedCoupon,
-      },
-    });
+    // 6. Atomic Transaction: Save Order + Update Points
+    const order = await prisma.$transaction(async (tx) => {
+      const createdOrder = await tx.order.create({
+        data: {
+          customerId: customer.id,
+          customerName: validated.customerName,
+          phone: validated.phone,
+          address: validated.address,
+          paymentMethod: validated.paymentMethod,
+          items: JSON.stringify(lineItems),
+          subtotal,
+          deliveryFee,
+          discount: totalDiscount,
+          pointsUsed,
+          pointsEarned,
+          total,
+          couponCode: appliedCoupon,
+        },
+      });
 
-    await prisma.customer.update({
-      where: { id: customer.id },
-      data: {
-        points: { increment: pointsEarned - pointsUsed },
-        totalSpent: { increment: total },
-        name: validated.customerName,
-      },
+      await tx.customer.update({
+        where: { id: customer.id },
+        data: {
+          points: { increment: pointsEarned - pointsUsed },
+          totalSpent: { increment: total },
+          name: validated.customerName,
+        },
+      });
+
+      return createdOrder;
     });
 
     return NextResponse.json(
@@ -108,7 +124,7 @@ const ip = forwarded ? forwarded.split(',')[0].trim() : (req.headers.get('x-real
         lineItems,
         subtotal,
         deliveryFee,
-        discount,
+        discount: totalDiscount,
         total,
         pointsEarned,
         couponCode: appliedCoupon,
