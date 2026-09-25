@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Providers from '@/components/Providers';
+import { WhatsAppButton } from '@/components/WhatsAppButton';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -34,7 +35,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="bg-white text-zinc-900">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <WhatsAppButton />
+        </Providers>
       </body>
     </html>
   );
