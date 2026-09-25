@@ -27,18 +27,27 @@ export default function AdminProducts() {
     setUploading(true);
     const reader = new FileReader();
     reader.onload = async () => {
-      const res = await fetch('/api/admin/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataUri: reader.result }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setForm((f: any) => ({ ...f, media: [...f.media, { type: data.type, url: data.url }] }));
-      } else {
-        alert(data.error || 'Upload failed');
+      try {
+        const res = await fetch('/api/admin/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataUri: reader.result }),
+        });
+        const data = await res.json();
+        if (res.ok && data.url) {
+          const mediaType = file.type.startsWith('video') ? 'video' : 'image';
+          setForm((f: any) => ({
+            ...f,
+            media: [...f.media, { type: mediaType, url: data.url }],
+          }));
+        } else {
+          alert(data.error || 'Upload failed');
+        }
+      } catch {
+        alert('Upload failed');
+      } finally {
+        setUploading(false);
       }
-      setUploading(false);
     };
     reader.readAsDataURL(file);
   }
