@@ -7,6 +7,7 @@ import ProductDetailModal from './ProductDetailModal';
 import { CatalogSearch } from '@/components/CatalogSearch';
 import TrustBadges from './TrustBadges';
 import CustomerReviews from './CustomerReviews';
+import Link from 'next/link';
 
 const CATEGORIES = [
   { id: 'all', label: 'All Products' },
@@ -188,39 +189,30 @@ export default function Storefront({
       <CustomerReviews />
 
       {/* Brand & Social Footer */}
-      <footer className="bg-zinc-900 text-white py-12 px-4 text-center text-sm">
-        <div className="max-w-md mx-auto space-y-3">
-          <div className="flex items-center justify-center gap-3">
-            <img src="/logo.png" alt="Dermashop LB" className="w-8 h-8 rounded-full border border-zinc-700" />
-            <span className="font-bold text-base tracking-wide">Dermashop LB</span>
-          </div>
-          <p className="text-xs text-zinc-400">
-            Premium Clinical Hair & Skin Solutions delivered across all Lebanese territories.
-          </p>
-          <div className="flex justify-center items-center gap-4 text-xs pt-1">
-            <a
-              href="https://instagram.com/dermashop.lb"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-pink-300 hover:text-pink-200 transition font-medium underline"
-            >
-              Follow on Instagram @dermashop.lb 📸
-            </a>
-            <span>·</span>
-            <a
-              href="https://wa.me/9613448482"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-emerald-400 hover:text-emerald-300 transition font-medium underline"
-            >
-              WhatsApp Support 💬
-            </a>
-          </div>
-          <p className="text-[11px] text-zinc-500 pt-3 border-t border-zinc-800">
-            &copy; {new Date().getFullYear()} Dermashop LB. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      <footer className="border-t border-zinc-200/80 bg-white py-10 px-4 text-center text-xs text-zinc-500 space-y-4">
+  <div className="flex justify-center items-center gap-4 sm:gap-6 font-medium text-zinc-600">
+    <Link href="/about" className="hover:text-zinc-900 transition-colors">
+      About Us
+    </Link>
+    <span>•</span>
+    <Link href="/privacy" className="hover:text-zinc-900 transition-colors">
+      Privacy Policy
+    </Link>
+    <span>•</span>
+    <a
+      href="https://instagram.com/dermashop.lb"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hover:text-zinc-900 transition-colors"
+    >
+      Follow on Instagram
+    </a>
+  </div>
+
+  <p className="text-[11px] text-zinc-400">
+    © {new Date().getFullYear()} Dermashop LB. All rights reserved.
+  </p>
+</footer>
 
       {/* Quick View Modal */}
       <ProductDetailModal
