@@ -1,4 +1,4 @@
-export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '9613448482';
+export const WHATSAPP_NUMBER = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '9613448482').replace(/\D/g, '');
 export const WISH_ACCOUNT = process.env.NEXT_PUBLIC_WISH_ACCOUNT || '03448482';
 
 interface OrderMessageInput {
@@ -47,6 +47,7 @@ export function buildWhatsAppMessage(o: OrderMessageInput): string {
   return encodeURIComponent(msg);
 }
 
-export function whatsappUrl(message: string): string {
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${message}`;
+export function whatsappUrl(encodedMessage: string): string {
+  const cleanPhone = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '9613448482').replace(/\D/g, '');
+  return `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
 }

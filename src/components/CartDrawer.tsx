@@ -1,5 +1,5 @@
 'use client';
-
+import { buildWhatsAppMessage, whatsappUrl } from '@/lib/whatsapp';
 import { useState, useEffect } from 'react';
 import { lineTotal, DELIVERY_FEE, FREE_DELIVERY_THRESHOLD } from '@/lib/pricing';
 
@@ -102,7 +102,7 @@ export default function CartDrawer({ open, onClose, cart, products, onUpdateQty,
         return;
       }
 
-      const { buildWhatsAppMessage, whatsappUrl } = await import('@/lib/whatsapp');
+      
       const message = buildWhatsAppMessage({
         items: data.lineItems,
         subtotal: data.subtotal,
