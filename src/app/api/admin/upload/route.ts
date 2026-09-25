@@ -8,7 +8,8 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const ip = req.ip ?? '127.0.0.1';
+const forwarded = req.headers.get('x-forwarded-for');
+const ip = forwarded ? forwarded.split(',')[0].trim() : (req.headers.get('x-real-ip') ?? '127.0.0.1');
   const { success } = await adminRateLimit.limit(ip);
   if (!success) return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
 

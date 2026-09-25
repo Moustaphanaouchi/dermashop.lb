@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AdminNav } from '../page';
+import { AdminNav } from '@/components/AdminNav';
 
 export default function AdminBranding() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);

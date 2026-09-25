@@ -1,8 +1,9 @@
 'use client';
-
+import { AdminNav } from '@/components/AdminNav';
 import { useEffect, useState } from 'react';
 import { signOut } from 'next-auth/react';
 import Link from 'next/link';
+
 
 const EMPTY: any = { name: '', category: 'skin', price: 0, bulkPrice: '', bulkQty: '', stock: true, badge: '', description: '', media: [] };
 
@@ -176,20 +177,6 @@ export default function AdminProducts() {
           ))}
         </div>
       </div>
-    </div>
-  );
-}
-
-export function AdminNav() {
-  return (
-    <div className="flex justify-between items-center mb-6 bg-white p-3 rounded-xl shadow">
-      <div className="flex gap-4 text-sm font-semibold">
-        <Link href="/admin">Products</Link>
-        <Link href="/admin/coupons">Coupons</Link>
-        <Link href="/admin/branding">Branding</Link>
-        <Link href="/admin/orders">Orders</Link>
-      </div>
-      <button onClick={() => signOut({ callbackUrl: '/admin/login' })} className="text-sm text-red-600">Logout</button>
     </div>
   );
 }

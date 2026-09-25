@@ -6,7 +6,8 @@ import { calculateDelivery, calculatePointsEarned, calculatePointsDiscount, line
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = req.ip ?? req.headers.get('x-forwarded-for') ?? '127.0.0.1';
+    const forwarded = req.headers.get('x-forwarded-for');
+const ip = forwarded ? forwarded.split(',')[0].trim() : (req.headers.get('x-real-ip') ?? '127.0.0.1');
     const { success } = await orderRateLimit.limit(ip);
     if (!success) {
       return NextResponse.json({ error: 'Too many orders. Please wait before ordering again.' }, { status: 429 });

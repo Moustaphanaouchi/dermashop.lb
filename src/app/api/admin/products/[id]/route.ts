@@ -5,13 +5,20 @@ import { productSchema } from '@/lib/validation';
 import { authOptions } from '@/lib/auth';
 import { adminRateLimit } from '@/lib/rate-limit';
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const ip = req.ip ?? '127.0.0.1';
+  const forwarded = req.headers.get('x-forwarded-for');
+  const ip = forwarded ? forwarded.split(',')[0].trim() : (req.headers.get('x-real-ip') ?? '127.0.0.1');
   const { success } = await adminRateLimit.limit(ip);
   if (!success) return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+
+  const { id } = await params;
 
   try {
     const body = await req.json();
@@ -22,13 +29,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const product = await prisma.$transaction(async (tx) => {
       if (validated.media) {
-        await tx.media.deleteMany({ where: { productId: params.id } });
+        await tx.media.deleteMany({ where: { productId: id } });
         await tx.media.createMany({
-          data: validated.media.map((m, i) => ({ productId: params.id, type: m.type, url: m.url, order: i })),
+          data: validated.media.map((m, i) => ({
+            productId: id,
+            type: m.type,
+            url: m.url,
+            order: i,
+          })),
         });
       }
       return tx.product.update({
-        where: { id: params.id },
+        where: { id },
         data: updateData,
         include: { media: { orderBy: { order: 'asc' } } },
       });
@@ -44,15 +56,37 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: RouteContext) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const { id } = await params;
+
   try {
-    await prisma.product.delete({ where: { id: params.id } });
+    await prisma.product.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: 'Failed to delete product' }, { status: 500 });
+  }
+}
+
+export async function GET(req: NextRequest, { params }: RouteContext) {
+  const { id } = await params;
+
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: { media: { orderBy: { order: 'asc' } } },
+    });
+
+    if (!product) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(product);
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: 'Failed to fetch product' }, { status: 500 });
   }
 }
