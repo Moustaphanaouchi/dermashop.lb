@@ -1,79 +1,52 @@
-import { WHATSAPP_NUMBER_WA_ME } from "@/state/catalog";
-import { formatUsd, type CartLine, computeCartPricing, getProductById } from "@/state/store";
-import type { Product } from "@/state/catalog";
+export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '9613448482';
+export const WISH_ACCOUNT = process.env.NEXT_PUBLIC_WISH_ACCOUNT || '03448482';
 
-export type PaymentMethod = "Cash on Delivery" | "WishPay";
-
-export type CheckoutDetails = {
-  fullName: string;
-  deliveryAddress: string;
-  phoneNumber: string;
-  paymentMethod: PaymentMethod;
-  wishPayAccountNumber: string;
-  appliedCouponCode?: string;
-  couponDiscountUsd?: number;
-};
-
-export function buildWhatsAppOrderText(
-  products: Product[],
-  cart: CartLine[],
-  details: CheckoutDetails,
-  pricingOverride?: {
-    subtotalUsd: number;
-    serumDiscountUsd: number;
-    couponDiscountUsd: number;
-    totalUsd: number;
-  }
-) {
-  const pricing = computeCartPricing(products, cart);
-  const subtotalUsd = pricingOverride?.subtotalUsd ?? pricing.subtotalUsd;
-  const serumDiscountUsd = pricingOverride?.serumDiscountUsd ?? pricing.serumDiscountUsd;
-  const couponDiscountUsd = pricingOverride?.couponDiscountUsd ?? (details.couponDiscountUsd ?? 0);
-  const totalUsd = pricingOverride?.totalUsd ?? pricing.totalUsd;
-
-  const lines: string[] = [];
-  lines.push("Dermashop LB — Order Request");
-  lines.push("");
-  lines.push("Items:");
-
-  for (const l of pricing.lines) {
-    const unit = l.product.priceUsd;
-    lines.push(`- ${l.product.name} x${l.quantity} (${formatUsd(unit)} each)`);
-  }
-
-  lines.push("");
-  lines.push(`Subtotal: ${formatUsd(subtotalUsd)}`);
-  if (serumDiscountUsd > 0) {
-    lines.push(`Serum Deal Discount: -${formatUsd(serumDiscountUsd)} (3 for $16)`);
-  }
-  if (couponDiscountUsd > 0 && details.appliedCouponCode) {
-    lines.push(`Coupon (${details.appliedCouponCode}): -${formatUsd(couponDiscountUsd)}`);
-  }
-  lines.push(`Total: ${formatUsd(totalUsd)}`);
-  lines.push("");
-  lines.push("Customer Details:");
-  lines.push(`Full Name: ${details.fullName}`);
-  lines.push(`Delivery Address: ${details.deliveryAddress}`);
-  lines.push(`Phone Number: ${details.phoneNumber}`);
-  lines.push("");
-  lines.push(`Payment Method: ${details.paymentMethod}`);
-  if (details.paymentMethod === "WishPay") {
-    lines.push(`WishPay Account Number to Pay: ${details.wishPayAccountNumber}`);
-  }
-
-  return lines.join("\n");
+interface OrderMessageInput {
+  items: { name: string; quantity: number; total: number }[];
+  subtotal: number;
+  deliveryFee: number;
+  discount: number;
+  total: number;
+  customerName: string;
+  phone: string;
+  address: string;
+  paymentMethod: 'cash' | 'wishpay';
+  couponCode?: string | null;
+  pointsEarned: number;
 }
 
-export function buildWhatsAppCheckoutUrl(message: string) {
-  return `https://wa.me/${WHATSAPP_NUMBER_WA_ME}?text=${encodeURIComponent(message)}`;
-}
+export function buildWhatsAppMessage(o: OrderMessageInput): string {
+  let msg = `🛍️ *DERMASHOP LB - New Order*\n\n📦 *ORDER DETAILS:*\n━━━━━━━━━━━━━━━\n\n`;
 
-export function canCheckout(products: Product[], cart: CartLine[]) {
-  if (cart.length === 0) return false;
-  for (const line of cart) {
-    const p = getProductById(products, line.productId);
-    if (!p || !p.inStock) return false;
+  o.items.forEach((item) => {
+    msg += `• ${item.name}\n  Qty: ${item.quantity} — $${item.total.toFixed(2)}\n\n`;
+  });
+
+  msg += `━━━━━━━━━━━━━━━\n`;
+  msg += `Subtotal: $${o.subtotal.toFixed(2)}\n`;
+  if (o.discount > 0) {
+    msg += `Discount: -$${o.discount.toFixed(2)}${o.couponCode ? ` (${o.couponCode})` : ''}\n`;
   }
-  return true;
+  msg += `Delivery: ${o.deliveryFee === 0 ? 'FREE ✅' : `$${o.deliveryFee.toFixed(2)}`}\n`;
+  msg += `*TOTAL: $${o.total.toFixed(2)}*\n\n`;
+
+  msg += `👤 *Full Name:* ${o.customerName}\n`;
+  msg += `📞 *Phone:* ${o.phone}\n`;
+  msg += `📍 *Delivery Address:* ${o.address}\n\n`;
+
+  msg += `💳 *Payment Method:* ${o.paymentMethod === 'cash' ? 'Cash on Delivery' : 'WishPay'}\n`;
+  if (o.paymentMethod === 'wishpay') {
+    msg += `Please send payment to Wish Money number: *${WISH_ACCOUNT}*\n\n`;
+  } else {
+    msg += `\n`;
+  }
+
+  msg += `🎁 You earned *${o.pointsEarned} loyalty points* on this order!\n\n`;
+  msg += `Thank you for choosing Dermashop LB! 🌟`;
+
+  return encodeURIComponent(msg);
 }
 
+export function whatsappUrl(message: string): string {
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${message}`;
+}

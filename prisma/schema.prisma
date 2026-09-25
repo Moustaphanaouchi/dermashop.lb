@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  category    String
+  price       Float
+  bulkPrice   Float?
+  bulkQty     Int?
+  stock       Boolean  @default(true)
+  badge       String?
+  description String
+  media       Media[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type      String
+  url       String
+  order     Int      @default(0)
+}
+
+model Coupon {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  active         Boolean  @default(true)
+  percentOff     Float?
+  dollarOff      Float?
+  firstOrderOnly Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  phone      String   @unique
+  name       String?
+  points     Int      @default(0)
+  totalSpent Float    @default(0)
+  orders     Order[]
+  createdAt  DateTime @default(now())
+}
+
+model Branding {
+  id      String  @id @default("single")
+  logoUrl String?
+}
+
+model Order {
+  id            String    @id @default(cuid())
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  customerName  String
+  phone         String
+  address       String
+  paymentMethod String
+  items         String
+  subtotal      Float
+  deliveryFee   Float
+  discount      Float     @default(0)
+  pointsUsed    Int       @default(0)
+  pointsEarned  Int       @default(0)
+  total         Float
+  couponCode    String?
+  status        String    @default("pending")
+  createdAt     DateTime  @default(now())
+
+  @@index([phone])
+  @@index([status])
+  @@index([createdAt])
+}

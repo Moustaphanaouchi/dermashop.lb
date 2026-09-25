@@ -1,346 +1,258 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Button } from "@/components/Button";
-import { cn } from "@/lib/cn";
-import { buildWhatsAppCheckoutUrl, buildWhatsAppOrderText, canCheckout, type PaymentMethod } from "@/lib/whatsapp";
-import { SERUM_BUNDLE, WHATSAPP_NUMBER_E164 } from "@/state/catalog";
-import { computeCartPricing, formatUsd, getCouponByCode, getProductById, useStore } from "@/state/store";
+import { useState, useEffect } from 'react';
+import { lineTotal, DELIVERY_FEE, FREE_DELIVERY_THRESHOLD } from '@/lib/pricing';
 
-function QtyButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-zinc-800 ring-1 ring-zinc-900/10 hover:bg-zinc-50"
-    >
-      {children}
-    </button>
-  );
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  cart: { id: string; quantity: number }[];
+  products: any[];
+  onUpdateQty: (id: string, delta: number) => void;
+  onRemove: (id: string) => void;
+  onOrderComplete: () => void;
 }
 
-export function CartDrawer() {
-  const { cartOpen, openCart, cart, products, coupons, appliedCouponCode, applyCoupon, clearCoupon, setQty, removeFromCart, clearCart } =
-    useStore();
-  const coupon = getCouponByCode(coupons, appliedCouponCode);
-  const pricing = computeCartPricing(products, cart, { coupon });
-  const checkoutEnabled = canCheckout(products, cart);
+export default function CartDrawer({ open, onClose, cart, products, onUpdateQty, onRemove, onOrderComplete }: Props) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'wishpay'>('cash');
+  const [couponInput, setCouponInput] = useState('');
+  const [couponApplied, setCouponApplied] = useState<{ code: string; percentOff?: number; dollarOff?: number } | null>(null);
+  const [couponMessage, setCouponMessage] = useState('');
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
+  const [redeemPoints, setRedeemPoints] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const [fullName, setFullName] = React.useState("");
-  const [deliveryAddress, setDeliveryAddress] = React.useState("");
-  const [phoneNumber, setPhoneNumber] = React.useState("");
-  const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethod>("Cash on Delivery");
-  const [couponInput, setCouponInput] = React.useState(appliedCouponCode);
+  const items = cart.map((c) => {
+    const p = products.find((p) => p.id === c.id)!;
+    return { ...c, product: p, total: lineTotal(p.price, c.quantity, p.bulkPrice, p.bulkQty) };
+  });
 
-  const wishPayAccountNumber = WHATSAPP_NUMBER_E164;
+  const subtotal = items.reduce((sum, i) => sum + i.total, 0);
 
-  const detailsFilled =
-    fullName.trim().length > 1 && deliveryAddress.trim().length > 6 && phoneNumber.trim().length > 5;
+  let discount = 0;
+  if (couponApplied) {
+    if (couponApplied.percentOff) discount = Math.max(discount, subtotal * (couponApplied.percentOff / 100));
+    if (couponApplied.dollarOff) discount = Math.max(discount, couponApplied.dollarOff);
+  }
+  if (redeemPoints && loyaltyPoints >= 100) {
+    discount += Math.floor(loyaltyPoints / 100) * 5;
+  }
 
-  const whatsappText = buildWhatsAppOrderText(
-    products,
-    cart,
-    {
-    fullName: fullName.trim(),
-    deliveryAddress: deliveryAddress.trim(),
-    phoneNumber: phoneNumber.trim(),
-    paymentMethod,
-    wishPayAccountNumber,
-    appliedCouponCode: coupon?.active ? coupon.code : "",
-      couponDiscountUsd: pricing.couponDiscountUsd
-    },
-    {
-      subtotalUsd: pricing.subtotalUsd,
-      serumDiscountUsd: pricing.serumDiscountUsd,
-      couponDiscountUsd: pricing.couponDiscountUsd,
-      totalUsd: pricing.totalUsd
+  const afterDiscount = Math.max(0, subtotal - discount);
+  const deliveryFee = afterDiscount >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
+  const total = afterDiscount + deliveryFee;
+
+  useEffect(() => {
+    if (phone.length >= 8) {
+      fetch(`/api/loyalty?phone=${encodeURIComponent(phone)}`)
+        .then((r) => r.json())
+        .then((d) => setLoyaltyPoints(d.points || 0))
+        .catch(() => {});
     }
-  );
-  const whatsappUrl = buildWhatsAppCheckoutUrl(whatsappText);
+  }, [phone]);
+
+  async function applyCoupon() {
+    if (!couponInput.trim()) return;
+    const res = await fetch(`/api/coupons/validate?code=${encodeURIComponent(couponInput)}&phone=${encodeURIComponent(phone)}`);
+    const data = await res.json();
+    if (data.valid) {
+      setCouponApplied({ code: data.code, percentOff: data.percentOff, dollarOff: data.dollarOff });
+      setCouponMessage(`✅ ${data.code} applied`);
+    } else {
+      setCouponApplied(null);
+      setCouponMessage(`❌ ${data.message}`);
+    }
+  }
+
+  async function handleCheckout() {
+    setError('');
+    if (!name.trim() || !phone.trim() || !address.trim()) {
+      setError('Please fill in your name, phone, and delivery address.');
+      return;
+    }
+    if (items.length === 0) {
+      setError('Your cart is empty.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: name,
+          phone,
+          address,
+          paymentMethod,
+          items: cart,
+          couponCode: couponApplied?.code,
+          redeemPoints: redeemPoints ? loyaltyPoints : 0,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong. Please try again.');
+        setSubmitting(false);
+        return;
+      }
+
+      const { buildWhatsAppMessage, whatsappUrl } = await import('@/lib/whatsapp');
+      const message = buildWhatsAppMessage({
+        items: data.lineItems,
+        subtotal: data.subtotal,
+        deliveryFee: data.deliveryFee,
+        discount: data.discount,
+        total: data.total,
+        customerName: name,
+        phone,
+        address,
+        paymentMethod,
+        couponCode: data.couponCode,
+        pointsEarned: data.pointsEarned,
+      });
+
+      window.open(whatsappUrl(message), '_blank');
+      onOrderComplete();
+      onClose();
+    } catch (e) {
+      setError('Network error. Please check your connection and try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!open) return null;
 
   return (
-    <AnimatePresence>
-      {cartOpen ? (
-        <>
-          <motion.div
-            key="backdrop"
-            className="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-[2px]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => openCart(false)}
-          />
+    <>
+      <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
+      <div className="fixed inset-y-0 right-0 w-full md:w-[420px] bg-white z-50 shadow-2xl flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b bg-blush">
+          <h2 className="text-xl font-bold">Your Cart</h2>
+          <button onClick={onClose} className="text-2xl leading-none">×</button>
+        </div>
 
-          <motion.aside
-            key="drawer"
-            className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-hidden bg-white shadow-luxe"
-            initial={{ x: 420 }}
-            animate={{ x: 0 }}
-            exit={{ x: 420 }}
-            transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            aria-label="Shopping cart"
-          >
-            <div className="flex h-full flex-col">
-              <div className="flex items-center justify-between border-b border-zinc-200/70 px-5 py-4">
-                <div>
-                  <div className="text-base font-semibold tracking-tight">Your Cart</div>
-                  <div className="text-xs text-zinc-500">Totals in USD • Pay via Wish Money</div>
-                </div>
-                <button
-                  className="rounded-full px-3 py-2 text-sm font-semibold text-zinc-600 hover:bg-zinc-900/5"
-                  onClick={() => openCart(false)}
-                >
-                  Close
-                </button>
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {items.length === 0 && <p className="text-center text-zinc-400 py-10">Your cart is empty</p>}
+
+          {items.map((item) => (
+            <div key={item.id} className="flex justify-between items-center bg-blush/40 rounded-xl p-3">
+              <div>
+                <p className="font-semibold text-sm">{item.product.name}</p>
+                <p className="text-xs text-zinc-500">${item.product.price} each</p>
               </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => onUpdateQty(item.id, -1)} className="w-7 h-7 rounded-full bg-white border">−</button>
+                <span className="w-5 text-center">{item.quantity}</span>
+                <button onClick={() => onUpdateQty(item.id, 1)} className="w-7 h-7 rounded-full bg-white border">+</button>
+                <button onClick={() => onRemove(item.id)} className="text-red-500 text-xs ml-2">✕</button>
+              </div>
+            </div>
+          ))}
 
-              <div className="flex-1 overflow-auto px-5 py-4">
-                {cart.length === 0 ? (
-                  <div className="rounded-3xl bg-blush-50 p-6 ring-1 ring-zinc-900/5">
-                    <div className="text-sm font-semibold">Your cart is empty.</div>
-                    <div className="mt-1 text-sm text-zinc-600">Add products and checkout via WhatsApp in seconds.</div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {cart.map((line) => {
-                      const product = getProductById(products, line.productId);
-                      if (!product) return null;
+          {items.length > 0 && (
+            <>
+              <div className="border-t pt-4 space-y-3">
+                <input
+                  className="w-full border rounded-lg p-2 text-sm"
+                  placeholder="Full Name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+                <input
+                  className="w-full border rounded-lg p-2 text-sm"
+                  placeholder="Phone Number"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+                <textarea
+                  className="w-full border rounded-lg p-2 text-sm"
+                  placeholder="Delivery Address (full details)"
+                  rows={2}
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                />
 
-                      return (
-                        <div
-                          key={line.productId}
-                          className={cn(
-                            "rounded-3xl bg-white p-4 shadow-luxeSoft ring-1 ring-zinc-900/5",
-                            !product.inStock && "opacity-70"
-                          )}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="text-sm font-semibold tracking-tight">{product.name}</div>
-                              <div className="mt-1 text-xs text-zinc-500">{formatUsd(product.priceUsd)} each</div>
-                              {!product.inStock ? (
-                                <div className="mt-2 text-xs font-semibold text-maroon-800">
-                                  Out of stock — remove to checkout
-                                </div>
-                              ) : null}
-                            </div>
-                            <button
-                              className="rounded-full px-3 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-900/5"
-                              onClick={() => removeFromCart(line.productId)}
-                            >
-                              Remove
-                            </button>
-                          </div>
-
-                          <div className="mt-4 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <QtyButton onClick={() => setQty(line.productId, line.quantity - 1)}>-</QtyButton>
-                              <div className="min-w-9 text-center text-sm font-semibold">{line.quantity}</div>
-                              <QtyButton onClick={() => setQty(line.productId, line.quantity + 1)}>+</QtyButton>
-                            </div>
-                            <div className="text-sm font-bold">{formatUsd(product.priceUsd * line.quantity)}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                {loyaltyPoints > 0 && (
+                  <label className="flex items-center gap-2 text-sm bg-green-50 border border-green-200 rounded-lg p-2">
+                    <input type="checkbox" checked={redeemPoints} onChange={(e) => setRedeemPoints(e.target.checked)} />
+                    You have {loyaltyPoints} points — redeem for ${Math.floor(loyaltyPoints / 100) * 5} off
+                  </label>
                 )}
 
-                <div className="mt-6 rounded-3xl bg-blush-50 p-5 ring-1 ring-zinc-900/5">
-                  <div className="text-sm font-semibold">Serum Bundle Offer</div>
-                  <div className="mt-1 text-sm text-zinc-700">
-                    Any 3 serums for <span className="font-bold">${SERUM_BUNDLE.groupPriceUsd}</span> (otherwise{" "}
-                    <span className="font-semibold">${SERUM_BUNDLE.unitPriceUsdDefault} each</span>).
-                  </div>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 border rounded-lg p-2 text-sm uppercase"
+                    placeholder="Coupon code"
+                    value={couponInput}
+                    onChange={(e) => setCouponInput(e.target.value)}
+                  />
+                  <button onClick={applyCoupon} className="px-3 py-2 bg-zinc-800 text-white rounded-lg text-sm">Apply</button>
                 </div>
-              </div>
+                {couponMessage && <p className="text-xs">{couponMessage}</p>}
 
-              <div className="border-t border-zinc-200/70 px-5 py-4">
-                <div className="space-y-1 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-600">Subtotal</span>
-                    <span className="font-semibold">{formatUsd(pricing.subtotalUsd)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-600">Serum deal</span>
-                    <span
-                      className={cn("font-semibold", pricing.serumDiscountUsd > 0 ? "text-emerald-700" : "text-zinc-500")}
-                    >
-                      -{formatUsd(pricing.serumDiscountUsd)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-600">Coupon</span>
-                    <span
-                      className={cn(
-                        "font-semibold",
-                        pricing.couponDiscountUsd > 0 ? "text-emerald-700" : "text-zinc-500"
-                      )}
-                    >
-                      -{formatUsd(pricing.couponDiscountUsd)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between pt-2 text-base">
-                    <span className="font-semibold">Total</span>
-                    <span className="font-bold">{formatUsd(pricing.totalUsd)}</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-3xl bg-white p-4 ring-1 ring-zinc-900/5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold tracking-tight">Coupon code</div>
-                      <div className="mt-1 text-xs text-zinc-500">Apply a promo code before checkout.</div>
-                    </div>
-                    {appliedCouponCode ? (
-                      <button
-                        onClick={() => {
-                          clearCoupon();
-                          setCouponInput("");
-                        }}
-                        className="rounded-full px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-900/5"
-                      >
-                        Clear
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="mt-3 flex items-center gap-2">
-                    <input
-                      value={couponInput}
-                      onChange={(e) => setCouponInput(e.target.value)}
-                      placeholder="e.g. WELCOME5"
-                      className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-maroon-800/40 focus:ring-2 focus:ring-maroon-800/15"
-                    />
-                    <Button
-                      variant="secondary"
-                      onClick={() => applyCoupon(couponInput)}
-                      disabled={couponInput.trim().length < 3}
-                    >
-                      Apply
-                    </Button>
-                  </div>
-                  {appliedCouponCode && !coupon ? (
-                    <div className="mt-2 text-xs font-semibold text-maroon-800">Invalid coupon code.</div>
-                  ) : null}
-                  {coupon && !coupon.active ? (
-                    <div className="mt-2 text-xs font-semibold text-maroon-800">This coupon is inactive.</div>
-                  ) : null}
-                  {coupon && coupon.active ? (
-                    <div className="mt-2 text-xs font-semibold text-emerald-700">
-                      Applied: {coupon.code}
-                      {coupon.title ? ` — ${coupon.title}` : ""}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="mt-4 rounded-3xl bg-white p-4 ring-1 ring-zinc-900/5">
-                  <div className="text-sm font-semibold tracking-tight">Delivery details</div>
-                  <div className="mt-3 space-y-2">
-                    <input
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Full Name"
-                      className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-maroon-800/40 focus:ring-2 focus:ring-maroon-800/15"
-                    />
-                    <input
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      placeholder="Phone Number"
-                      inputMode="tel"
-                      className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-maroon-800/40 focus:ring-2 focus:ring-maroon-800/15"
-                    />
-                    <textarea
-                      value={deliveryAddress}
-                      onChange={(e) => setDeliveryAddress(e.target.value)}
-                      placeholder="Delivery Address (Area, Street, Building, Floor, Notes...)"
-                      rows={3}
-                      className="w-full resize-none rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm outline-none focus:border-maroon-800/40 focus:ring-2 focus:ring-maroon-800/15"
-                    />
-                  </div>
-
-                  <div className="mt-4 text-sm font-semibold tracking-tight">Payment</div>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-sm font-semibold mb-2">Payment Method</p>
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => setPaymentMethod("Cash on Delivery")}
-                      className={cn(
-                        "rounded-2xl px-3 py-3 text-sm font-semibold ring-1 ring-zinc-900/10 transition",
-                        paymentMethod === "Cash on Delivery"
-                          ? "bg-maroon-800 text-white"
-                          : "bg-white text-zinc-800 hover:bg-zinc-50"
-                      )}
+                      onClick={() => setPaymentMethod('cash')}
+                      className={`flex-1 py-2 rounded-lg text-sm border ${paymentMethod === 'cash' ? 'bg-maroon text-white' : 'bg-white'}`}
                     >
                       Cash on Delivery
                     </button>
                     <button
-                      onClick={() => setPaymentMethod("WishPay")}
-                      className={cn(
-                        "rounded-2xl px-3 py-3 text-sm font-semibold ring-1 ring-zinc-900/10 transition",
-                        paymentMethod === "WishPay" ? "bg-maroon-800 text-white" : "bg-white text-zinc-800 hover:bg-zinc-50"
-                      )}
+                      onClick={() => setPaymentMethod('wishpay')}
+                      className={`flex-1 py-2 rounded-lg text-sm border ${paymentMethod === 'wishpay' ? 'bg-maroon text-white' : 'bg-white'}`}
                     >
                       WishPay
                     </button>
                   </div>
-
-                  {paymentMethod === "WishPay" ? (
-                    <div className="mt-3 rounded-2xl bg-blush-50 p-3 text-xs text-zinc-700 ring-1 ring-zinc-900/5">
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          Send payment to this WishPay account number:{" "}
-                          <span className="font-semibold text-zinc-900">{wishPayAccountNumber}</span>
-                        </div>
-                        <button
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(wishPayAccountNumber);
-                            } catch {
-                              // ignore
-                            }
-                          }}
-                          className="shrink-0 rounded-full bg-white px-3 py-2 text-[11px] font-semibold text-zinc-700 ring-1 ring-zinc-900/10 hover:bg-zinc-50"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-3 rounded-2xl bg-blush-50 p-3 text-xs text-zinc-700 ring-1 ring-zinc-900/5">
-                      Pay on delivery (cash). We’ll confirm availability and delivery by WhatsApp.
-                    </div>
+                  {paymentMethod === 'wishpay' && (
+                    <p className="text-xs text-zinc-500 mt-2">
+                      Send payment to Wish Money account: <strong>03448482</strong>
+                    </p>
                   )}
                 </div>
-
-                <div className="mt-4 grid grid-cols-1 gap-2">
-                  <Button
-                    onClick={() => {
-                      window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-                    }}
-                    disabled={!checkoutEnabled || !detailsFilled}
-                  >
-                    Complete Order via WhatsApp
-                  </Button>
-                  <Button variant="ghost" onClick={() => clearCart()} disabled={cart.length === 0}>
-                    Clear cart
-                  </Button>
-                </div>
-
-                {!checkoutEnabled && cart.length > 0 ? (
-                  <div className="mt-3 text-xs font-semibold text-maroon-800">
-                    Please remove out-of-stock items before checkout.
-                  </div>
-                ) : null}
-
-                {checkoutEnabled && cart.length > 0 && !detailsFilled ? (
-                  <div className="mt-3 text-xs font-semibold text-maroon-800">
-                    Please fill your name, phone number, and delivery address to continue.
-                  </div>
-                ) : null}
               </div>
-            </div>
-          </motion.aside>
-        </>
-      ) : null}
-    </AnimatePresence>
+
+              <div className="border-t pt-4 space-y-1 text-sm">
+                <div className="flex justify-between"><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
+                {discount > 0 && <div className="flex justify-between text-green-600"><span>Discount</span><span>-${discount.toFixed(2)}</span></div>}
+                <div className="flex justify-between">
+                  <span>Delivery</span>
+                  <span>{deliveryFee === 0 ? 'FREE' : `$${deliveryFee.toFixed(2)}`}</span>
+                </div>
+                {deliveryFee > 0 && (
+                  <p className="text-xs text-zinc-400">Free delivery on orders over ${FREE_DELIVERY_THRESHOLD}</p>
+                )}
+                <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                  <span>Total</span><span className="text-maroon">${total.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {error && <p className="text-red-600 text-sm">{error}</p>}
+            </>
+          )}
+        </div>
+
+        {items.length > 0 && (
+          <div className="p-5 border-t">
+            <button
+              onClick={handleCheckout}
+              disabled={submitting}
+              className="w-full bg-green-600 text-white py-3 rounded-xl font-bold disabled:opacity-50"
+            >
+              {submitting ? 'Placing order...' : 'Complete Order via WhatsApp'}
+            </button>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
-

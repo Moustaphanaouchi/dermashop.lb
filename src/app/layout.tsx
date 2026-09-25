@@ -1,24 +1,18 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import { StoreProvider } from "@/state/store";
+import type { Metadata } from 'next';
+import Providers from '@/components/Providers';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: "Dermashop LB — Premium Hair & Skin",
-  description:
-    "Luxury clinical hair & skin solutions in Lebanon. Fast WhatsApp checkout. Pay via Wish Money."
+  title: 'Dermashop LB | Premium Hair & Skin Solutions',
+  description: 'Luxury clinical hair and skin care, delivered across Lebanon.',
 };
 
-export default function RootLayout({
-  children
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <StoreProvider>{children}</StoreProvider>
+      <body className="bg-white text-zinc-900">
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
 }
-
