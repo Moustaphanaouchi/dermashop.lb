@@ -172,17 +172,17 @@ export default function CartDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <div className="fixed inset-0 z-[999] overflow-hidden">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
 
-      <div className="absolute inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
-        <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col justify-between">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10 z-[1000]">
+        <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col justify-between relative">
           {/* Header */}
-          <div className="p-4 sm:p-5 border-b border-pink-100 flex items-center justify-between">
+          <div className="p-4 sm:p-5 border-b border-zinc-100 flex items-center justify-between bg-white z-10">
             <h2 className="text-base sm:text-lg font-bold text-zinc-900 flex items-center gap-2">
               <span>Your Shopping Bag</span>
               <span className="text-xs bg-rose-50 text-rose-800 font-semibold px-2 py-0.5 rounded-full">
@@ -191,7 +191,7 @@ export default function CartDrawer({
             </h2>
             <button
               onClick={onClose}
-              className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 transition"
+              className="p-1 rounded-full text-zinc-400 hover:text-zinc-700 transition"
             >
               ✕
             </button>
@@ -294,18 +294,18 @@ export default function CartDrawer({
                       value={couponCode}
                       onChange={(e) => setCouponCode(e.target.value)}
                       placeholder="Promo code (e.g. WELCOME10)"
-                      className="flex-1 px-3 py-1.5 text-xs border border-zinc-200 rounded-xl uppercase tracking-wider focus:outline-none focus:ring-1 focus:ring-rose-400"
+                      className="flex-1 px-3 py-2 text-xs border border-zinc-300 rounded-xl uppercase tracking-wider text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-rose-500 font-medium"
                     />
                     <button
                       type="submit"
-                      className="px-4 py-1.5 bg-zinc-800 hover:bg-black text-white text-xs font-semibold rounded-xl transition"
+                      className="px-4 py-2 bg-zinc-900 hover:bg-black text-white text-xs font-semibold rounded-xl transition"
                     >
                       Apply
                     </button>
                   </form>
                 )}
                 {couponError && (
-                  <p className="text-[11px] text-rose-600 mt-1">{couponError}</p>
+                  <p className="text-[11px] text-rose-600 mt-1 font-medium">{couponError}</p>
                 )}
               </div>
             )}
@@ -317,7 +317,7 @@ export default function CartDrawer({
                 onSubmit={handleCheckout}
                 className="space-y-3 pt-3 border-t border-zinc-100"
               >
-                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700">
                   Delivery Details (Lebanon)
                 </h3>
 
@@ -327,7 +327,7 @@ export default function CartDrawer({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Full Name *"
-                  className="w-full px-3 py-2 text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-400"
+                  className="w-full px-3 py-2 text-xs border border-zinc-300 rounded-xl text-zinc-900 placeholder:text-zinc-400 font-medium focus:outline-none focus:ring-1 focus:ring-rose-500"
                 />
 
                 <input
@@ -336,13 +336,13 @@ export default function CartDrawer({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="WhatsApp Mobile (+961 XX XXX XXX) *"
-                  className="w-full px-3 py-2 text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-400"
+                  className="w-full px-3 py-2 text-xs border border-zinc-300 rounded-xl text-zinc-900 placeholder:text-zinc-400 font-medium focus:outline-none focus:ring-1 focus:ring-rose-500"
                 />
 
                 <select
                   value={region}
                   onChange={(e) => setRegion(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-zinc-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-rose-400"
+                  className="w-full px-3 py-2 text-xs border border-zinc-300 rounded-xl bg-white text-zinc-900 font-medium focus:outline-none focus:ring-1 focus:ring-rose-500"
                 >
                   {LEBANON_REGIONS.map((r) => (
                     <option key={r} value={r}>
@@ -357,22 +357,22 @@ export default function CartDrawer({
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="Detailed Address (Street, Building, Floor) *"
-                  className="w-full px-3 py-2 text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-400 resize-none"
+                  className="w-full px-3 py-2 text-xs border border-zinc-300 rounded-xl text-zinc-900 placeholder:text-zinc-400 font-medium focus:outline-none focus:ring-1 focus:ring-rose-500 resize-none"
                 />
 
                 {/* Payment Option */}
                 <div className="pt-1">
-                  <label className="text-[11px] font-semibold text-zinc-600 block mb-1.5">
+                  <label className="text-[11px] font-bold text-zinc-700 block mb-1.5">
                     Select Payment Method:
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('cod')}
-                      className={`p-2 rounded-xl text-left border text-xs transition ${
+                      className={`p-2.5 rounded-xl text-left border text-xs transition ${
                         paymentMethod === 'cod'
-                          ? 'border-zinc-900 bg-zinc-50 font-bold text-zinc-900'
-                          : 'border-zinc-200 text-zinc-500'
+                          ? 'border-zinc-900 bg-zinc-900 text-white font-bold shadow-xs'
+                          : 'border-zinc-200 text-zinc-600 hover:border-zinc-300'
                       }`}
                     >
                       💵 Cash on Delivery
@@ -380,10 +380,10 @@ export default function CartDrawer({
                     <button
                       type="button"
                       onClick={() => setPaymentMethod('whish')}
-                      className={`p-2 rounded-xl text-left border text-xs transition ${
+                      className={`p-2.5 rounded-xl text-left border text-xs transition ${
                         paymentMethod === 'whish'
-                          ? 'border-rose-600 bg-rose-50/50 font-bold text-rose-900'
-                          : 'border-zinc-200 text-zinc-500'
+                          ? 'border-rose-700 bg-rose-700 text-white font-bold shadow-xs'
+                          : 'border-zinc-200 text-zinc-600 hover:border-zinc-300'
                       }`}
                     >
                       📱 Whish Money
@@ -394,28 +394,28 @@ export default function CartDrawer({
             )}
           </div>
 
-          {/* Footer & Order Action */}
+          {/* Footer & Order Action (Solid White & Raised Elevation) */}
           {cart.length > 0 && (
-            <div className="p-4 sm:p-5 border-t border-pink-100 bg-stone-50/50 space-y-2">
-              <div className="space-y-1 text-xs">
-                <div className="flex justify-between text-zinc-500">
+            <div className="p-4 sm:p-5 border-t border-zinc-200 bg-white relative z-20 shadow-[0_-8px_25px_rgba(0,0,0,0.08)] space-y-2.5">
+              <div className="space-y-1.5 text-xs text-zinc-700">
+                <div className="flex justify-between font-medium">
                   <span>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span className="text-zinc-900 font-semibold">${subtotal.toFixed(2)}</span>
                 </div>
 
                 {appliedDiscount && (
-                  <div className="flex justify-between text-emerald-700 font-medium">
+                  <div className="flex justify-between text-emerald-700 font-semibold">
                     <span>Discount ({appliedDiscount.code})</span>
                     <span>-${discountAmount.toFixed(2)}</span>
                   </div>
                 )}
 
-                <div className="flex justify-between text-zinc-500">
+                <div className="flex justify-between font-medium">
                   <span>Delivery across Lebanon</span>
-                  <span>${deliveryFee.toFixed(2)}</span>
+                  <span className="text-zinc-900 font-semibold">${deliveryFee.toFixed(2)}</span>
                 </div>
 
-                <div className="flex justify-between text-sm font-bold text-zinc-900 pt-1 border-t border-zinc-200">
+                <div className="flex justify-between text-base font-extrabold text-zinc-900 pt-2 border-t border-zinc-200">
                   <span>Total</span>
                   <span>${total.toFixed(2)}</span>
                 </div>
@@ -425,14 +425,14 @@ export default function CartDrawer({
                 type="submit"
                 form="checkout-form"
                 disabled={submitting}
-                className="w-full mt-3 py-3 bg-[#25D366] hover:bg-[#20ba59] active:scale-98 text-white rounded-2xl text-xs font-bold tracking-wide uppercase shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+                className="w-full mt-2 py-3.5 bg-[#25D366] hover:bg-[#20ba59] active:scale-[0.98] text-white rounded-2xl text-xs font-bold tracking-wider uppercase shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-60 cursor-pointer"
               >
                 <span>
                   {submitting
                     ? 'Processing...'
                     : 'Confirm Order via WhatsApp'}
                 </span>
-                <span>💬</span>
+                <span className="text-base">💬</span>
               </button>
             </div>
           )}
