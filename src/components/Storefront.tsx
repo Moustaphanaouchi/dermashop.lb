@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import ProductCard from './ProductCard';
 import CartDrawer from './CartDrawer';
+import ProductDetailModal from './ProductDetailModal';
 import { CatalogSearch } from '@/components/CatalogSearch';
 
 const CATEGORIES = [
@@ -25,12 +26,18 @@ export default function Storefront({
   const [cart, setCart] = useState<{ id: string; quantity: number }[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [category, setCategory] = useState('all');
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
 
-  function addToCart(id: string) {
+  // Updated to handle bulk/bundle quantities from the quick-view modal and product card
+  function addToCart(id: string, quantityToAdd: number = 1) {
     setCart((prev) => {
       const existing = prev.find((i) => i.id === id);
-      if (existing) return prev.map((i) => (i.id === id ? { ...i, quantity: i.quantity + 1 } : i));
-      return [...prev, { id, quantity: 1 }];
+      if (existing) {
+        return prev.map((i) =>
+          i.id === id ? { ...i, quantity: i.quantity + quantityToAdd } : i
+        );
+      }
+      return [...prev, { id, quantity: quantityToAdd }];
     });
   }
 
@@ -157,7 +164,12 @@ export default function Storefront({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProducts.map((p) => (
-              <ProductCard key={p.id} product={p} onAdd={addToCart} />
+              <ProductCard 
+                key={p.id} 
+                product={p} 
+                onAdd={addToCart} 
+                onQuickView={setSelectedProduct} 
+              />
             ))}
           </div>
         )}
@@ -168,6 +180,13 @@ export default function Storefront({
         <p className="mt-2 text-zinc-400">🚚 Delivering to all regions of Lebanon</p>
         <p className="mt-4 text-zinc-500">&copy; {new Date().getFullYear()} Dermashop LB</p>
       </footer>
+
+      {/* Quick View Modal */}
+      <ProductDetailModal
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAdd={addToCart}
+      />
 
       <CartDrawer
         open={cartOpen}
