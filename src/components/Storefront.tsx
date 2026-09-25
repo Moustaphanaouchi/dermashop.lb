@@ -50,26 +50,56 @@ export default function Storefront({
     <div className="min-h-screen bg-gradient-to-b from-blush/30 via-white to-white">
       {/* Header with Search Bar in between Logo and Cart */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-pink-100 shadow-xs">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3 sm:gap-6">
-          {/* Left: Brand Logo & Title */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {logoUrl ? (
-              <img src={logoUrl} alt="Dermashop LB" className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover" />
-            ) : (
-              <img
-                src="/logo.png"
-                alt="Dermashop LB Logo"
-                className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover border border-rose-100 shadow-xs"
+        <div className="max-w-6xl mx-auto px-4 py-2.5">
+          {/* Top Line on Mobile, Single Flex Row on Desktop */}
+          <div className="flex items-center justify-between gap-3">
+            
+            {/* Left: Brand Logo & Title */}
+            <div className="flex items-center gap-2.5 shrink-0">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Dermashop LB" className="h-9 w-9 rounded-full object-cover" />
+              ) : (
+                <img
+                  src="/logo.png"
+                  alt="Dermashop LB Logo"
+                  className="w-9 h-9 rounded-full object-cover border border-rose-100 shadow-xs"
+                />
+              )}
+              <div>
+                <h1 className="font-bold text-sm sm:text-base leading-tight text-zinc-900">Dermashop LB</h1>
+                <p className="text-[10px] text-zinc-400 hidden xs:block">Hair & Skin Solutions</p>
+              </div>
+            </div>
+
+            {/* Desktop Center Search Bar (Hidden on Mobile) */}
+            <div className="hidden md:block flex-1 max-w-md mx-4">
+              <CatalogSearch
+                products={products}
+                onFilter={setFilteredProducts}
+                categories={CATEGORIES}
+                activeCategory={category}
+                onSelectCategory={setCategory}
               />
-            )}
-            <div className="hidden sm:block">
-              <h1 className="font-bold text-base sm:text-lg leading-tight">Dermashop LB</h1>
-              <p className="text-[10px] sm:text-xs text-zinc-500">Premium Hair & Skin Solutions</p>
+            </div>
+
+            {/* Right: Cart Button */}
+            <div className="shrink-0">
+              <button
+                onClick={() => setCartOpen(true)}
+                className="relative bg-maroon text-white px-3.5 py-1.5 rounded-full text-xs font-semibold active:scale-95 transition-transform flex items-center gap-1.5 shadow-xs"
+              >
+                <span>Cart</span>
+                {cartCount > 0 && (
+                  <span className="bg-white text-maroon text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
 
-          {/* Center: Search Bar */}
-          <div className="flex-1 max-w-md">
+          {/* Mobile Bottom Search Bar (Visible only on Mobile) */}
+          <div className="md:hidden mt-2 pt-1 border-t border-pink-50">
             <CatalogSearch
               products={products}
               onFilter={setFilteredProducts}
@@ -77,16 +107,6 @@ export default function Storefront({
               activeCategory={category}
               onSelectCategory={setCategory}
             />
-          </div>
-
-          {/* Right: Cart Button */}
-          <div className="shrink-0">
-            <button
-              onClick={() => setCartOpen(true)}
-              className="relative bg-maroon text-white px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold active:scale-95 transition-transform"
-            >
-              Cart {cartCount > 0 && `(${cartCount})`}
-            </button>
           </div>
         </div>
       </header>
