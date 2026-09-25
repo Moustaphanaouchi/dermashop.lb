@@ -34,11 +34,14 @@ export function buildWhatsAppMessage(o: OrderMessageInput): string {
   msg += `📞 *Phone:* ${o.phone}\n`;
   msg += `📍 *Delivery Address:* ${o.address}\n\n`;
 
-  msg += `💳 *Payment Method:* ${o.paymentMethod === 'cash' ? 'Cash on Delivery' : 'WishPay'}\n`;
   if (o.paymentMethod === 'wishpay') {
-    msg += `Please send payment to Wish Money number: *${WISH_ACCOUNT}*\n\n`;
+    msg += `💳 *Payment Method:* Whish Money\n`;
+    msg += `📲 *Whish Account:* ${WISH_ACCOUNT}\n`;
+    msg += `💵 *Amount to Send:* $${o.total.toFixed(2)}\n\n`;
+    msg += `⚠️ *Action Required:*\n`;
+    msg += `Please transfer *$${o.total.toFixed(2)}* via the Whish app to *${WISH_ACCOUNT}*, then send the receipt / transfer screenshot right here in this chat to confirm your order.\n\n`;
   } else {
-    msg += `\n`;
+    msg += `💳 *Payment Method:* Cash on Delivery (COD)\n\n`;
   }
 
   msg += `🎁 You earned *${o.pointsEarned} loyalty points* on this order!\n\n`;
